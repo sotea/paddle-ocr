@@ -89,7 +89,7 @@ nohup bash scripts/run_server.sh 8118 > /tmp/vllm_server.log 2>&1 &
 ```
 
 起動完了（約 40 秒）を確認:
-
+- 約40秒後にサーバが立ち上がったかを確認します。/tmp/vllm_server.log を tail などで覗けば、起動の進捗やエラーもリアルタイムに追えます。
 ```bash
 curl -s http://127.0.0.1:8118/v1/models
 # => {"object":"list","data":[{"id":"PaddleOCR-VL-1.6-0.9B",...}]} が返れば OK

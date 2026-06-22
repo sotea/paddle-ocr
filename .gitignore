@@ -3,7 +3,8 @@
 /output/
 *.md.bak
 
-# サンプル入力（任意・必要なら個別に管理）
+# 入力（任意・必要なら個別に管理）
+/input
 /sample.pdf
 /*.pdf
 /*.png

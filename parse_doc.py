@@ -31,8 +31,14 @@ OUTPUT_DIR = "/mnt/c/projects/paddle-ocr/output"
 def main() -> None:
     input_path = sys.argv[1] if len(sys.argv) > 1 else DEMO_IMAGE
     log(f"入力: {input_path}")
-    log(f"出力先: {OUTPUT_DIR}")
-    Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+
+    # 入力ファイル名(拡張子なし)のサブフォルダを output/ 配下に作り、そこへ保存する。
+    # 複数ファイルを解析しても出力が混ざらないようにするため。
+    # URL 入力でもパス末尾のファイル名から stem を取り出せる。
+    stem = Path(input_path).stem
+    out_dir = os.path.join(OUTPUT_DIR, stem)
+    log(f"出力先: {out_dir}")
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
 
     # 初回はモデル(PaddleOCR-VL-1.6 など)を自動ダウンロードするため時間がかかります
     log("パイプライン初期化(モデルロード)開始 ...")
@@ -57,10 +63,10 @@ def main() -> None:
     log(f"推論 完了 ({time.time() - t1:.1f}s)")
 
     for res in results:
-        res.save_to_json(save_path=OUTPUT_DIR)
-        res.save_to_markdown(save_path=OUTPUT_DIR)
+        res.save_to_json(save_path=out_dir)
+        res.save_to_markdown(save_path=out_dir)
 
-    log(f"[DONE] 解析完了。'{OUTPUT_DIR}' に Markdown / JSON を保存しました。")
+    log(f"[DONE] 解析完了。'{out_dir}' に Markdown / JSON を保存しました。")
 
 
 if __name__ == "__main__":
