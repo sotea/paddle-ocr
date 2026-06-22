@@ -31,6 +31,8 @@ Windows 11
 
 ## セットアップ手順（初回のみ）
 
+> 以降の手順は、本リポジトリを Windows 側 `c:\projects\paddle-ocr`（WSL から `/mnt/c/projects/paddle-ocr`）に clone した前提で記載しています。別の場所に置いた場合は、各コマンド中のこのパスをご自身の clone 先に読み替えてください。
+
 すべて WSL の bash で実行します。スクリプトは CRLF 改行のため、各スクリプトは事前に `sed -i 's/\r$//'` で LF 化してから実行してください（下記コマンドに含めています）。
 
 ### 0. 前提ツール
@@ -105,7 +107,7 @@ bash scripts/run.sh parse_doc.py
 bash scripts/run.sh parse_doc.py /mnt/c/projects/paddle-ocr/sample.pdf
 ```
 
-出力は `c:\projects\paddle-ocr\output`（= `/mnt/c/projects/paddle-ocr/output`）に保存されます。
+出力は既定でリポジトリ直下の `output/` に保存されます（環境変数 `PADDLEOCR_OUTPUT_DIR` で変更可能）。
 
 - `<name>.md` … 見出し・段落・表・画像埋め込み付き Markdown
 - `<name>_res.json` … 座標等を含む構造化 JSON
@@ -171,3 +173,8 @@ wsl -e bash -lc "pkill -f paddlex_genai_server"
 
 - [PaddlePaddle/PaddleOCR-VL-1.6 (HuggingFace)](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6) — Apache-2.0
 - パラメータ約 0.9B / 重み約 1.9GB。109+ 言語対応、テキスト・表・数式・チャート・印影の認識に対応。
+
+## ライセンス
+
+本リポジトリのコード・スクリプトは [MIT License](LICENSE) です。
+利用する PaddleOCR-VL-1.6 モデルは Apache-2.0（上記リンク参照）で別途配布されています。

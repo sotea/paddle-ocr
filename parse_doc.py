@@ -24,8 +24,11 @@ DEMO_IMAGE = (
     "paddlex/imgs/demo_image/paddleocr_vl_demo.png"
 )
 
-# 出力は Windows 側のプロジェクトフォルダに保存し、Cursor から見えるようにする
-OUTPUT_DIR = "/mnt/c/projects/paddle-ocr/output"
+# 出力先。環境変数 PADDLEOCR_OUTPUT_DIR で上書き可能。
+# 既定はこのスクリプトと同じディレクトリ直下の output/（リポジトリ相対なので
+# clone する場所に依存しない）。
+DEFAULT_OUTPUT_DIR = str(Path(__file__).resolve().parent / "output")
+OUTPUT_DIR = os.environ.get("PADDLEOCR_OUTPUT_DIR", DEFAULT_OUTPUT_DIR)
 
 
 def main() -> None:

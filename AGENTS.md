@@ -39,7 +39,7 @@ bash scripts/run.sh parse_doc.py /mnt/c/projects/paddle-ocr/sample.pdf
 pkill -f paddlex_genai_server
 ```
 
-出力は `output/` に保存されます（`<name>.md` / `<name>_res.json` / `imgs/`）。`output/` は生成物なのでコミットしません（`.gitignore` 済み）。
+出力は既定でリポジトリ直下の `output/` に保存されます（`<name>.md` / `<name>_res.json` / `imgs/`）。保存先は環境変数 `PADDLEOCR_OUTPUT_DIR` で変更可能。`output/` は生成物なのでコミットしません（`.gitignore` 済み）。
 
 ## コーディング規約・慣習
 
