@@ -62,11 +62,31 @@ def main() -> None:
     results = list(output)
     log(f"推論 完了 ({time.time() - t1:.1f}s)")
 
+    # 1) ページ単位で Markdown / JSON を保存する。
+    #    画像も含めて save_to_markdown 側が imgs/ 等へ書き出すため、
+    #    結合版で画像参照を活かすにもこの保存が必要。
+    markdown_list = []
     for res in results:
         res.save_to_json(save_path=out_dir)
         res.save_to_markdown(save_path=out_dir)
+        # 結合用に各ページの markdown データ(テキスト+画像参照の dict)を集める
+        markdown_list.append(res.markdown)
 
-    log(f"[DONE] 解析完了。'{out_dir}' に Markdown / JSON を保存しました。")
+    # 2) 全ページを結合した 1 つの Markdown を追加で書き出す。
+    #    ページをまたぐ表・段落を考慮するため、パイプライン提供の結合関数を使う。
+    merged_md_path = os.path.join(out_dir, f"{stem}.md")
+    markdown_texts = pipeline.concatenate_markdown_pages(markdown_list)
+    # 環境によって戻り値が (テキスト, 画像dict) のタプルの場合があるため吸収する
+    if isinstance(markdown_texts, tuple):
+        markdown_texts = markdown_texts[0]
+    with open(merged_md_path, "w", encoding="utf-8") as f:
+        f.write(markdown_texts)
+    log(f"結合 Markdown を保存: {merged_md_path}")
+
+    log(
+        f"[DONE] 解析完了。'{out_dir}' にページ単位の Markdown / JSON と "
+        f"結合版 '{stem}.md' を保存しました。"
+    )
 
 
 if __name__ == "__main__":
