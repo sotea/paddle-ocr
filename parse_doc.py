@@ -62,6 +62,8 @@ def main() -> None:
     log("推論(predict)開始 ...")
     t1 = time.time()
     output = pipeline.predict(input_path)
+    # output はジェネレータのため、list() に渡して確定（マテリアライズ）させ、
+    # 推論時間を計測する。
     results = list(output)
     log(f"推論 完了 ({time.time() - t1:.1f}s)")
 
