@@ -125,16 +125,53 @@ pkill -f paddlex_genai_server
 
 ## PowerShell から直接実行する場合
 
+> **重要**: `wsl -e bash -lc "... &"` のように **バックグラウンド(`&`)で起動しない**でください。
+> `wsl -e` のワンショット実行はコマンドが戻った時点で WSL セッションを手放すため、
+> 直後に WSL ディストロごとシャットダウンし、起動したサーバも一緒に停止します
+> （`/tmp` も初期化されログも残りません）。
+> サーバは下記のように **専用ウィンドウで前面起動して常駐**させます。
+
 ```powershell
-# サーバ起動
-wsl -e bash -lc "cd /mnt/c/projects/paddle-ocr && nohup bash scripts/run_server.sh 8118 > /tmp/vllm_server.log 2>&1 &"
+# (再起動時のみ) 既存サーバ・子プロセスが残っているとポート 8118 衝突で新規起動が即終了する。
+# vLLM は APIServer 以外に EngineCore などの子プロセスも生成するため -9 で確実に止め、
+# ポートが解放される(free になる)まで確認してから起動する。
+wsl -e bash -lc "pkill -9 -f paddlex_genai_server; sleep 3; (ss -ltn 2>/dev/null | grep -q ':8118 ' && echo 'PORT 8118 STILL IN USE' || echo 'port 8118 free')"
+
+# サーバ起動: 専用ウィンドウで前面起動し、ログも残す（このウィンドウは閉じないこと）
+# 注意: -ArgumentList は「1 つの文字列」で渡し、bash へのコマンドは二重引用符で囲む。
+# 配列（'-e','bash',...）で渡すと Windows PowerShell 5.1 はスペースを含む要素を
+# 引用符で括らないため、bash -lc が受け取るスクリプトが先頭の cd だけになり即終了する。
+Start-Process wsl -ArgumentList '-e bash -lc "cd /mnt/c/projects/paddle-ocr && bash scripts/run_server.sh 8118 2>&1 | tee /mnt/c/projects/paddle-ocr/vllm_server.log"'
+
+# サーバ起動確認（約 40 秒後。モデル一覧が返れば OK）
+wsl -e bash -lc "curl -s http://127.0.0.1:8118/v1/models"
 
 # 解析実行
 wsl -e bash -lc "cd /mnt/c/projects/paddle-ocr && bash scripts/run.sh parse_doc.py /mnt/c/projects/paddle-ocr/sample.pdf"
 
-# サーバ停止
-wsl -e bash -lc "pkill -f paddlex_genai_server"
+# サーバ停止（EngineCore などの子プロセスも残さないよう -9 で確実に止める）
+wsl -e bash -lc "pkill -9 -f paddlex_genai_server"
 ```
+
+> **起動ウィンドウが一瞬で消えてサーバが立ち上がらない場合**: `Start-Process` で開いた
+> ウィンドウは中のプロセスが終了すると即閉じるため、原因が見えないまま一瞬で消えます。
+> よくある原因は次の 2 つです。
+>
+> 1. **`-ArgumentList` の引数渡しミス（ログすら作られない場合はこれ）**:
+>    `-ArgumentList '-e','bash','-lc','cd ... | tee ...'` のように **配列**で渡すと、
+>    Windows PowerShell 5.1 はスペースを含む要素（bash コマンド文字列）を引用符で
+>    括らずに wsl へ渡します。その結果 `bash -lc` が受け取るスクリプトが先頭の `cd` だけ
+>    になり、bash はホームへ移動して即終了します。`tee` も走らないので `vllm_server.log`
+>    すら作られません。上記コマンドのように **引数全体を 1 つの文字列**にし、bash への
+>    コマンドを**二重引用符**で囲んでください。
+> 2. **ポート 8118 が使用中（ログに衝突エラーが残る場合はこれ）**:
+>    すでに別のサーバが動いている（前回の起動分が残っている等）と、新規プロセスが
+>    衝突で即終了します。上記の `pkill -9 -f paddlex_genai_server` で既存プロセスを
+>    止め、`port 8118 free` を確認してから起動し直してください。
+>
+> エラー内容は `vllm_server.log`（上記コマンドで Windows 側に出力）で確認できます。
+> なお `Start-Process` 内で `> file 2>&1` リダイレクトにすると画面に何も出ないまま
+> 消えて原因が分かりづらいため、上記では `tee` で**画面表示とログ保存を両立**しています。
 
 ---
 
@@ -167,6 +204,8 @@ wsl -e bash -lc "pkill -f paddlex_genai_server"
 - **flash-attn のバージョン**: `paddlex` が要求する `flash-attn 2.8.2` には torch2.8 用プレビルト wheel が無いため、ABI 互換の **2.8.3 (torch2.8/cp312/cxx11abiTRUE)** wheel を直接 URL 指定で導入しています（`nvcc` でのソースビルド回避）。`paddlex` のプラグイン判定はバージョン不問（import 可否のみ）のため問題ありません。
 - **Triton JIT が `Python.h` を要求**: gcc 導入後の続きの問題。Triton のビルドが今度は `fatal error: Python.h: No such file or directory` を出します。`build-essential` には Python 開発ヘッダが含まれないため、`get_pyheaders.sh` で `libpython3.12-dev` を deb 展開し、`run_server.sh` の `CPATH` で参照しています（sudo 不要）。
 - **GPU メモリ**: vLLM はデフォルトで GPU メモリの大部分を予約します。本環境では `gpu_memory_utilization=0.5`（約 8GB）で起動し、ディスプレイ使用分との競合を回避しています。
+- **PowerShell から `wsl -e ... &` で起動するとサーバが即停止する**: `wsl -e bash -lc "... &"` はバックグラウンド起動した直後に `wsl -e` コマンドが終了し、WSL セッションを保持するプロセスが無くなります。すると WSL2 はアイドルタイムアウトで**ディストロごとシャットダウン**するため、常駐させたい vLLM サーバも一緒に停止します（`/tmp/vllm_server.log` も消え、後から `curl .../v1/models` が無応答・ログ無しになります）。対処: PowerShell からは `Start-Process wsl -ArgumentList '-e','bash','-lc','... bash scripts/run_server.sh 8118'` で**専用ウィンドウを開いて前面起動**し、そのウィンドウを開いたままにします。WSL の対話的ターミナル内であれば「使い方」の `nohup ... &` 方式でも常駐します（ターミナルを閉じない前提）。
+- **`Start-Process` の起動ウィンドウが一瞬で消えてサーバが立ち上がらない**: `Start-Process` で開いたウィンドウは中のプロセスが終了すると即閉じます。前面起動の手順自体が正しくても**すでに別のサーバが動いていてポート 8118 が使用中**だと、vLLM が起動途中で `WARNING port 8118 is used by process ... paddlex_genai_server` を出して**自分から終了**し、エラーが見えないまま一瞬で消えます。注意したいのは、vLLM は `APIServer` 以外に `EngineCore` などの**子プロセス**も生成するため、`pkill -f paddlex_genai_server`（既定は SIGTERM）では子プロセスが残ってポート/GPU を掴み続けることがある点です。対処: `wsl -e bash -lc "pkill -9 -f paddlex_genai_server; sleep 3"` で確実に止め、`ss -ltn | grep ':8118 '` で**ポートが解放された**ことを確認してから起動し直す。エラーを確実に残すには、`Start-Process` 内で `... bash scripts/run_server.sh 8118 2>&1 | tee /mnt/c/projects/paddle-ocr/vllm_server.log` のように `tee` で画面表示とログ保存を両立させる（`> file 2>&1` だと画面に何も出ず消えて原因が分かりづらい）。
 - **改行コード**: スクリプトは Windows 上で編集されるため CRLF になりがちです。実行前に `sed -i 's/\r$//'` で LF 化してください。
 
 ## モデル
